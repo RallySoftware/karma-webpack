@@ -14,7 +14,11 @@ function Plugin(
 			/* config.frameworks */frameworks,
 			fileList,
 			customFileHandlers,
-			emitter) {
+			emitter,
+			logger) {
+	var log = logger.create('karma-webpack');
+	this.log = log;
+	this.log.debug('Building karma-webpack plugin');
 	webpackOptions = _.clone(webpackOptions) || {};
 	webpackMiddlewareOptions = _.clone(webpackMiddlewareOptions || webpackServerOptions) || {};
 
@@ -58,6 +62,7 @@ function Plugin(
 	}, this);
 
 	compiler.plugin("done", function(stats) {
+		this.log.debug('compiler done');
 		var applyStats = Array.isArray(stats.stats) ? stats.stats : [stats];
 		var assets = [];
 		var noAssets = false;
@@ -74,14 +79,18 @@ function Plugin(
 		}
 
 		if(this.waiting && !noAssets) {
+			this.log.debug('compiler done, executing wait queue');
 			var w = this.waiting;
 			this.waiting = null;
 			w.forEach(function(cb) {
 				cb();
 			});
+		} else {
+			this.log.debug('compiler done, not waiting');
 		}
 	}.bind(this));
 	compiler.plugin("invalid", function() {
+		this.log.debug('compiler invalid', this.waiting);
 		if(!this.waiting) this.waiting = [];
 	}.bind(this));
 
@@ -99,12 +108,14 @@ function Plugin(
 	});
 
 	emitter.on("exit", function (done) {
+		log.debug('exiting');
 		middleware.close();
 		done();
 	});
 }
 
 Plugin.prototype.notifyKarmaAboutChanges = function() {
+	this.log.debug('notifying karma, force a rebuild');
 	// Force a rebuild
 	this.fileList.refresh();
 };
@@ -116,6 +127,7 @@ Plugin.prototype.addFile = function(entry) {
 };
 
 Plugin.prototype.make = function(compilation, callback) {
+	this.log.debug('make', this.files.slice());
 	async.forEach(this.files.slice(), function(file, callback) {
 		var entry = file;
 		if (this.wrapMocha) {
@@ -126,6 +138,7 @@ Plugin.prototype.make = function(compilation, callback) {
 		compilation.addEntry("", dep, path.relative(this.basePath, file).replace(/\\/g, "/"), function() {
 			// If the module fails because of an File not found error, remove the test file
 			if(dep.module && dep.module.error && dep.module.error.error && dep.module.error.error.code === "ENOENT") {
+				this.log.error('make error', file, dep.module.error);
 				this.files = this.files.filter(function(f) {
 					return file !== f;
 				});
@@ -139,7 +152,7 @@ Plugin.prototype.make = function(compilation, callback) {
 Plugin.prototype.readFile = function(file, callback) {
 	var middleware = this.middleware;
 	var optionsCount = this.optionsCount;
-
+	var log = this.log;
 	function doRead() {
 		if(optionsCount > 1) {
 			async.times(optionsCount, function(idx, callback) {
@@ -154,27 +167,35 @@ Plugin.prototype.readFile = function(file, callback) {
 				callback(null, Buffer.concat(contents));
 			});
 		} else {
+			log.debug('filesystem is', middleware.fileSystem.data)
 			middleware.fileSystem.readFile("/_karma_webpack_/" + file.replace(/\\/g, "/"), callback);
 		}
 	}
-	if(!this.waiting)
+	if(!this.waiting){
+		this.log.debug('reading file immediately', file);
 		doRead();
-	else
+	} else {
+		this.log.debug('queing file read', file);
 		// Retry to read once a build is finished
 		// do it on process.nextTick to catch changes while building
 		this.waiting.push(process.nextTick.bind(process, this.readFile.bind(this, file, callback)));
+	}
 };
 
-function createPreprocesor(/* config.basePath */basePath, webpackPlugin) {
-	return function(content, file, done) {
+function createPreprocesor(/* config.basePath */basePath, webpackPlugin, logger) {	
+	var log = logger.create('karma-webpack')	
 
+	return function(content, file, done) {
+		log.debug('preprocessing "%s".', file.originalPath)
 		if (webpackPlugin.addFile(file.path)) {
+			log.debug('new file, invalidating middleware "%s".', file.originalPath)
 			// recompile as we have an asset that we have not seen before
 			webpackPlugin.middleware.invalidate();
 		}
 
 		// read blocks until bundle is done
 		webpackPlugin.readFile(path.relative(basePath, file.path), function(err, content) {
+			log.debug('content loaded "%s".', file.originalPath)
 			if (err) {
 				throw err;
 			}
