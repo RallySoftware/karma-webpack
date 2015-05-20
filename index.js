@@ -4,6 +4,7 @@ var async = require("async");
 var webpackDevMiddleware = require("webpack-dev-middleware");
 var webpack = require("webpack");
 var SingleEntryDependency = require("webpack/lib/dependencies/SingleEntryDependency");
+var ProgressPlugin = require('webpack/lib/ProgressPlugin');
 
 function Plugin(
 			/* config.webpack */webpackOptions,
@@ -20,6 +21,12 @@ function Plugin(
 	this.log = log;
 	this.log.debug('Building karma-webpack plugin');
 	webpackOptions = _.clone(webpackOptions) || {};
+	if(webpackOptions.progress){
+		webpackOptions.plugins = webpackOptions.plugins || [];
+		webpackOptions.plugins.push(new ProgressPlugin(function(progress, msg){
+			log.debug('PROGRESS', progress, msg)
+		}));
+	};
 	webpackMiddlewareOptions = _.clone(webpackMiddlewareOptions || webpackServerOptions) || {};
 
 	var applyOptions = Array.isArray(webpackOptions) ? webpackOptions : [webpackOptions];
