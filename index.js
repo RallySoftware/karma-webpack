@@ -149,10 +149,23 @@ Plugin.prototype.make = function(compilation, callback) {
 	}.bind(this), callback);
 };
 
+Plugin.prototype._fileTree = function(){
+	// var tree = _.cloneDeep(this.middleware.fileSystem.data)
+	// var tree = _.cloneDeep(this.middleware.fileSystem.data, function(value){
+	// 	return typeof value
+	// 	// return ((value instanceof Buffer) || _.isArray(value)) ? '<fileData:'+value.length+'>' : value;
+	// });
+	// return JSON.stringify(tree, null, 2);
+	// return typeof tree['_karma_webpack_']['0.chunk.js']
+	// return tree;
+	return this.middleware.fileSystem.data;
+};
+
 Plugin.prototype.readFile = function(file, callback) {
 	var middleware = this.middleware;
 	var optionsCount = this.optionsCount;
 	var log = this.log;
+	var _fileTree = this._fileTree.bind(this);
 	function doRead() {
 		if(optionsCount > 1) {
 			async.times(optionsCount, function(idx, callback) {
@@ -167,7 +180,7 @@ Plugin.prototype.readFile = function(file, callback) {
 				callback(null, Buffer.concat(contents));
 			});
 		} else {
-			log.debug('filesystem is', middleware.fileSystem.data)
+			log.debug('filesystem has files', _fileTree());
 			middleware.fileSystem.readFile("/_karma_webpack_/" + file.replace(/\\/g, "/"), callback);
 		}
 	}
