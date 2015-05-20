@@ -180,18 +180,25 @@ Plugin.prototype.make = function(compilation, callback) {
 
 		var dep = new SingleEntryDependency(entry);
 		this.log.debug('addEntry', file);
-		compilation.addEntry("", dep, path.relative(this.basePath, file).replace(/\\/g, "/"), function() {
-			// If the module fails because of an File not found error, remove the test file
-			if(dep.module && dep.module.error && dep.module.error.error && dep.module.error.error.code === "ENOENT") {
-				this.log.error('make error', file, dep.module.error);
-				this.files = this.files.filter(function(f) {
-					return file !== f;
-				});
-				this.middleware.invalidate();
-			}
-			this.log.debug('addEntry callback', file);
-			callback();
-		}.bind(this));
+		try {
+			compilation.addEntry("", dep, path.relative(this.basePath, file).replace(/\\/g, "/"), function() {
+				this.log.debug('inside addEntry typeof dep:', typeof dep)
+				// If the module fails because of an File not found error, remove the test file
+				if(dep.module && dep.module.error && dep.module.error.error && dep.module.error.error.code === "ENOENT") {
+					this.log.error('addEntry error', file, dep.module.error);
+					this.files = this.files.filter(function(f) {
+						return file !== f;
+					});
+					this.log.debug('addEntry error invalidating');
+					this.middleware.invalidate();
+				}
+				this.log.debug('addEntry callback', file);
+				callback();
+			}.bind(this));
+		} catch(e){
+			this.log.debug('addEntry exception', e);
+		}
+
 	}.bind(this), callback);
 };
 
