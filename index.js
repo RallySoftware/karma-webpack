@@ -89,6 +89,16 @@ Plugin.prototype._init = function(/* config.webpack */webpackOptions,
 		compiler.plugin("make", this.make.bind(this));
 	}, this);
 
+	_.each(['done', 'make', 'failed', 'emit', 'compile', 'watch-run', 'compilation', 'after-compile', 'invalid', 'after-plugins', 'after-resolvers'], function(eventName){
+		compiler.plugin(eventName, function(){
+			this.log.debug('compiler event', eventName);
+			if(_.isFunction(_.last(arguments))){
+				_.last(arguments)()
+			}
+		}.bind(this))	
+	}.bind(this))
+	
+
 	compiler.plugin("done", function(stats) {
 		this.log.debug('compiler done');
 		var applyStats = Array.isArray(stats.stats) ? stats.stats : [stats];
@@ -169,6 +179,7 @@ Plugin.prototype.make = function(compilation, callback) {
 		}
 
 		var dep = new SingleEntryDependency(entry);
+		this.log.debug('addEntry', file);
 		compilation.addEntry("", dep, path.relative(this.basePath, file).replace(/\\/g, "/"), function() {
 			// If the module fails because of an File not found error, remove the test file
 			if(dep.module && dep.module.error && dep.module.error.error && dep.module.error.error.code === "ENOENT") {
@@ -178,6 +189,7 @@ Plugin.prototype.make = function(compilation, callback) {
 				});
 				this.middleware.invalidate();
 			}
+			this.log.debug('addEntry callback', file);
 			callback();
 		}.bind(this));
 	}.bind(this), callback);
@@ -234,7 +246,7 @@ function createPreprocesor(/* config.basePath */basePath, webpackPlugin, logger)
 
 	return function(content, file, done) {
 		log.debug('preprocessing "%s".', file.originalPath)
-		
+		if(webpackPlugin.isInitialized) return;
 		if (webpackPlugin.addFile(file.path)) {
 			log.debug('new file, invalidating middleware "%s".', file.originalPath)
 			// recompile as we have an asset that we have not seen before
