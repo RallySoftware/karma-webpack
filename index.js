@@ -18,6 +18,7 @@ function Plugin(
 			emitter,
 			logger) {
 	this.constructorArgs = _.map(arguments, _.identity);
+	this.files = [];
 }
 
 Plugin.prototype.init = function(){
@@ -75,8 +76,7 @@ Plugin.prototype._init = function(/* config.webpack */webpackOptions,
 
 	this.fileList = fileList;
 	this.wrapMocha = frameworks.indexOf('mocha') >= 0 && includeIndex;
-	this.optionsCount = applyOptions.length;
-	this.files = [];
+	this.optionsCount = applyOptions.length;	
 	this.basePath = basePath;
 	this.waiting = [];
 
@@ -150,9 +150,14 @@ Plugin.prototype.notifyKarmaAboutChanges = function() {
 };
 
 Plugin.prototype.addFile = function(entry) {
-	if(this.files.indexOf(entry) >= 0) return;
-	this.files.push(entry);
-	return true;
+	if(this.files.indexOf(entry) >= 0){
+		added = false;
+	} else {
+		this.files.push(entry);
+		added = true;
+	}
+	this.init();
+	return added;
 };
 
 Plugin.prototype.make = function(compilation, callback) {
@@ -229,7 +234,6 @@ function createPreprocesor(/* config.basePath */basePath, webpackPlugin, logger)
 
 	return function(content, file, done) {
 		log.debug('preprocessing "%s".', file.originalPath)
-		webpackPlugin.init();
 		
 		if (webpackPlugin.addFile(file.path)) {
 			log.debug('new file, invalidating middleware "%s".', file.originalPath)
