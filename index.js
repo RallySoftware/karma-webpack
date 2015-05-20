@@ -17,6 +17,27 @@ function Plugin(
 			customFileHandlers,
 			emitter,
 			logger) {
+	this.constructorArgs = _.map(arguments, _.identity);
+}
+
+Plugin.prototype.init = function(){
+	if(!this.isInitialized){
+		this._init.apply(this, this.constructorArgs);
+		this.isInitialized = true;
+	}
+};
+
+Plugin.prototype._init = function(/* config.webpack */webpackOptions,
+			/* config.webpackServer */webpackServerOptions,
+			/* config.webpackMiddleware */webpackMiddlewareOptions,
+			/* config.basePath */basePath,
+			/* config.files */files,
+			/* config.frameworks */frameworks,
+			fileList,
+			customFileHandlers,
+			emitter,
+			logger){
+
 	var log = logger.create('karma-webpack');
 	this.log = log;
 	this.log.debug('Building karma-webpack plugin');
@@ -107,6 +128,7 @@ function Plugin(
 	customFileHandlers.push({
 		urlRegex: /^\/_karma_webpack_\/.*/,
 		handler: function(req, res) {
+			log.debug('middleware request', req.url);
 			middleware(req, res, function() {
 				res.statusCode = 404;
 				res.end('Not found');
@@ -207,6 +229,8 @@ function createPreprocesor(/* config.basePath */basePath, webpackPlugin, logger)
 
 	return function(content, file, done) {
 		log.debug('preprocessing "%s".', file.originalPath)
+		webpackPlugin.init();
+		
 		if (webpackPlugin.addFile(file.path)) {
 			log.debug('new file, invalidating middleware "%s".', file.originalPath)
 			// recompile as we have an asset that we have not seen before
